@@ -1,0 +1,155 @@
+const soap = require('soap');
+const http = require('http');
+
+// Dummy data for books
+let books = [
+  { id: 1, title: '1984', author: 'George Orwell', genre: 'Dystopian' },
+  { id: 2, title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', genre: 'Classic' },
+  { id: 3, title: 'Moby Dick', author: 'Herman Melville', genre: 'Adventure' }
+];
+
+// SOAP Service Definition
+const service = {
+  BookService: {
+    BookPort: {
+      getBooks: (args, callback) => {
+        callback({ books: books });
+      },
+      getBookById: (args, callback) => {
+        const book = books.find(b => b.id === parseInt(args.id));
+        if (book) {
+          callback({ book: book });
+        } else {
+          callback({ error: 'Book not found' });
+        }
+      },
+      addBook: (args, callback) => {
+        const { title, author, genre } = args;
+        const newBook = {
+          id: books.length + 1,
+          title,
+          author,
+          genre
+        };
+        books.push(newBook);
+        callback({ book: newBook });
+      },
+      updateBook: (args, callback) => {
+        const { id, title, author, genre } = args;
+        const bookIndex = books.findIndex(b => b.id === parseInt(id));
+        if (bookIndex !== -1) {
+          books[bookIndex] = { id: parseInt(id), title, author, genre };
+          callback({ book: books[bookIndex] });
+        } else {
+          callback({ error: 'Book not found' });
+        }
+      },
+      deleteBook: (args, callback) => {
+        const bookIndex = books.findIndex(b => b.id === parseInt(args.id));
+        if (bookIndex !== -1) {
+          books.splice(bookIndex, 1);
+          callback({ success: true });
+        } else {
+          callback({ error: 'Book not found' });
+        }
+      }
+    }
+  }
+};
+
+// SOAP XML WSDL Definition
+const wsdl = `
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="urn:BookService" name="BookService" targetNamespace="urn:BookService">
+  <message name="getBooksRequest" />
+  <message name="getBooksResponse">
+    <part name="books" type="xsd:string"/>
+  </message>
+  <message name="getBookByIdRequest">
+    <part name="id" type="xsd:int"/>
+  </message>
+  <message name="getBookByIdResponse">
+    <part name="book" type="xsd:string"/>
+  </message>
+  <message name="addBookRequest">
+    <part name="title" type="xsd:string"/>
+    <part name="author" type="xsd:string"/>
+    <part name="genre" type="xsd:string"/>
+  </message>
+  <message name="addBookResponse">
+    <part name="book" type="xsd:string"/>
+  </message>
+  <message name="updateBookRequest">
+    <part name="id" type="xsd:int"/>
+    <part name="title" type="xsd:string"/>
+    <part name="author" type="xsd:string"/>
+    <part name="genre" type="xsd:string"/>
+  </message>
+  <message name="updateBookResponse">
+    <part name="book" type="xsd:string"/>
+  </message>
+  <message name="deleteBookRequest">
+    <part name="id" type="xsd:int"/>
+  </message>
+  <message name="deleteBookResponse">
+    <part name="success" type="xsd:boolean"/>
+  </message>
+  <portType name="BookPortType">
+    <operation name="getBooks">
+      <input message="tns:getBooksRequest"/>
+      <output message="tns:getBooksResponse"/>
+    </operation>
+    <operation name="getBookById">
+      <input message="tns:getBookByIdRequest"/>
+      <output message="tns:getBookByIdResponse"/>
+    </operation>
+    <operation name="addBook">
+      <input message="tns:addBookRequest"/>
+      <output message="tns:addBookResponse"/>
+    </operation>
+    <operation name="updateBook">
+      <input message="tns:updateBookRequest"/>
+      <output message="tns:updateBookResponse"/>
+    </operation>
+    <operation name="deleteBook">
+      <input message="tns:deleteBookRequest"/>
+      <output message="tns:deleteBookResponse"/>
+    </operation>
+  </portType>
+  <binding name="BookPortBinding" type="tns:BookPortType">
+    <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="getBooks">
+      <soap:operation soapAction="urn:getBooks"/>
+      <input>
+        <soap:body use="encoded" namespace="urn:BookService" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </input>
+      <output>
+        <soap:body use="encoded" namespace="urn:BookService" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </output>
+    </operation>
+    <operation name="getBookById">
+      <soap:operation soapAction="urn:getBookById"/>
+      <input>
+        <soap:body use="encoded" namespace="urn:BookService" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </input>
+      <output>
+        <soap:body use="encoded" namespace="urn:BookService" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/>
+      </output>
+    </operation>
+  </binding>
+  <service name="BookService">
+    <port name="BookPort" binding="tns:BookPortBinding">
+      <soap:address location="http://localhost:8000/soap"/>
+    </port>
+  </service>
+</definitions>
+`;
+
+const server = http.createServer(function (req, res) {
+  res.end('SOAP service is running');
+});
+
+soap.listen(server, '/soap', service, wsdl);
+
+server.listen(8000, () => {
+  console.log('SOAP service running at http://localhost:8000/soap');
+});
